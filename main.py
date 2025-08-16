@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 
-# Simple data classes to avoid Pydantic issues
+
 @dataclass
 class LogoDesign:
     """Simple logo design data class"""
@@ -34,7 +34,7 @@ class LogoGeneratorAgent:
     def __init__(self, model_name: str = "llama2"):
         self.llm = OllamaLLM(
             model=model_name,
-            temperature=0.8,  # Higher creativity
+            temperature=0.8,  
             num_predict=512
         )
         
@@ -72,7 +72,7 @@ class LogoGeneratorAgent:
     def parse_logo_response(self, response: str, logo_id: int) -> LogoDesign:
         """Parse the LLM response into a LogoDesign object"""
         try:
-            # Try to extract JSON from response
+           
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
@@ -89,7 +89,7 @@ class LogoGeneratorAgent:
         except Exception as e:
             print(f"    ⚠️ JSON parsing failed, using fallback: {e}")
         
-        # Fallback parsing - extract information from text
+        
         return self.create_fallback_logo(response, logo_id)
     
     def create_fallback_logo(self, response: str, logo_id: int) -> LogoDesign:
@@ -101,7 +101,7 @@ class LogoGeneratorAgent:
         color_scheme = "Blue gradient with white accents"
         symbolism = "Represents artificial intelligence, learning, and community"
         
-        # Try to extract information from the response
+       
         for line in lines:
             line = line.strip()
             if "title:" in line.lower() or "name:" in line.lower():
@@ -146,7 +146,7 @@ class LogoGeneratorAgent:
                 
             except Exception as e:
                 print(f"  ❌ Error generating logo {i+1}: {e}")
-                # Create a fallback logo
+             
                 fallback_logo = LogoDesign(
                     id=i+1,
                     title=f"SCALE AI Logo {i+1}",
@@ -166,7 +166,7 @@ class LogoJudgeAgent:
     def __init__(self, model_name: str = "llama2"):
         self.llm = OllamaLLM(
             model=model_name,
-            temperature=0.3,  # Lower temperature for consistent evaluation
+            temperature=0.3, 
             num_predict=512
         )
     
@@ -218,7 +218,7 @@ class LogoJudgeAgent:
     def parse_evaluation_response(self, response: str, logo_id: int) -> LogoEvaluation:
         """Parse the LLM response into a LogoEvaluation object"""
         try:
-            # Try to extract JSON from response
+           
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
@@ -244,12 +244,12 @@ class LogoJudgeAgent:
         except Exception as e:
             print(f"    ⚠️ JSON parsing failed, using fallback evaluation: {e}")
         
-        # Fallback evaluation
+       
         return self.create_fallback_evaluation(response, logo_id)
     
     def create_fallback_evaluation(self, response: str, logo_id: int) -> LogoEvaluation:
         """Create a fallback evaluation from unstructured text"""
-        # Extract numbers from response for scoring
+      
         numbers = re.findall(r'\b([1-9]|10)\b', response)
         
         if len(numbers) >= 5:
@@ -289,7 +289,7 @@ class LogoJudgeAgent:
             
         except Exception as e:
             print(f"  ❌ Error evaluating logo {logo.id}: {e}")
-            # Fallback evaluation
+          
             return LogoEvaluation(
                 logo_id=logo.id,
                 clarity_score=7,
@@ -321,8 +321,8 @@ class LogoPipeline:
     def __init__(self, model_name: str = "llama2"):
         self.generator = LogoGeneratorAgent(model_name)
         self.judge = LogoJudgeAgent(model_name)
-        self.threshold_score = 40  # Minimum score for acceptance
-        self.max_iterations = 3    # Maximum iterations for improvement
+        self.threshold_score = 40  
+        self.max_iterations = 3    
     
     def run_pipeline(self, club_description: str, personal_vision: str, num_logos: int = 3, iterative: bool = False) -> Dict[str, Any]:
         """Run the complete logo generation and evaluation pipeline"""
@@ -340,19 +340,18 @@ class LogoPipeline:
             print(f"\n📍 ITERATION {iteration}")
             print("-" * 40)
             
-            # Generate logos
             logos = self.generator.generate_logos(club_description, personal_vision, num_logos)
             
-            # Evaluate logos
+           
             evaluations = self.judge.evaluate_all_logos(logos, club_description, personal_vision)
             
-            # Find best logo in current iteration
+           
             current_best_eval = max(evaluations, key=lambda x: x.total_score)
             current_best_logo = next(logo for logo in logos if logo.id == current_best_eval.logo_id)
             
             print(f"\n🏅 Best logo this iteration: '{current_best_logo.title}' (Score: {current_best_eval.total_score}/50)")
             
-            # Store results
+            
             iteration_result = {
                 "iteration": iteration,
                 "logos": logos,
@@ -362,13 +361,13 @@ class LogoPipeline:
             }
             all_results.append(iteration_result)
             
-            # Update overall best
+         
             if current_best_eval.total_score > best_score:
                 best_score = current_best_eval.total_score
                 best_logo = current_best_logo
                 best_evaluation = current_best_eval
             
-            # Check stopping conditions
+          
             if not iterative:
                 break
                 
@@ -383,7 +382,7 @@ class LogoPipeline:
             iteration += 1
             print(f"\n🔄 Score {current_best_eval.total_score} below threshold {self.threshold_score}. Continuing...")
         
-        # Prepare final results
+      
         final_results = {
             "winning_logo": best_logo,
             "winning_evaluation": best_evaluation,
@@ -442,11 +441,11 @@ class LogoPipeline:
             for i, (logo, eval_data) in enumerate(zip(iteration_data["logos"], iteration_data["evaluations"])):
                 print(f"  Logo {i+1}: '{logo.title}' - Score: {eval_data.total_score}/50")
 
-# Example usage and main execution
+
 def main():
     """Main function to run the logo pipeline"""
     
-    # SCALE club description and personal vision
+    
     club_description = """
     SCALE is an AI/ML club focused on fostering learning, innovation, and community building 
     in the field of artificial intelligence and machine learning. The club aims to provide 
@@ -465,11 +464,11 @@ def main():
     join our journey in exploring the frontiers of artificial intelligence.
     """
     
-    # Initialize and run pipeline
+    
     print("Initializing Logo Pipeline...")
     pipeline = LogoPipeline(model_name="llama2")
     
-    # Run basic pipeline (3 logos, single iteration)
+    
     print("\n🎯 Running Basic Pipeline...")
     basic_results = pipeline.run_pipeline(
         club_description=club_description,
@@ -478,10 +477,9 @@ def main():
         iterative=False
     )
     
-    # Show detailed summary
+   
     pipeline.display_detailed_summary(basic_results)
-    
-    # Run iterative pipeline (bonus feature)
+   
     print("\n\n🎯 Running Iterative Pipeline...")
     iterative_results = pipeline.run_pipeline(
         club_description=club_description,
@@ -490,7 +488,7 @@ def main():
         iterative=True
     )
     
-    # Show detailed summary
+   
     pipeline.display_detailed_summary(iterative_results)
     
     return iterative_results
