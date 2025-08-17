@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 
-# Simple data classes to avoid Pydantic issues
+
 @dataclass
 class LogoDesign:
-    """Simple logo design data class"""
+   
     id: int
     title: str
     description: str
@@ -19,7 +19,7 @@ class LogoDesign:
 
 @dataclass
 class LogoEvaluation:
-    """Simple logo evaluation data class"""
+
     logo_id: int
     clarity_score: int
     relevance_score: int
@@ -30,17 +30,17 @@ class LogoEvaluation:
     reasoning: str
 
 class LogoGeneratorAgent:
-    """Agent responsible for generating logo designs"""
+
     
     def __init__(self, model_name: str = "llama2"):
         self.llm = OllamaLLM(
             model=model_name,
-            temperature=0.8,  # Higher creativity
+            temperature=0.8,  
             num_predict=512
         )
         
     def create_generation_prompt(self) -> PromptTemplate:
-        """Create prompt template for logo generation"""
+        # creating prompt template for logo generation
         template = """
         You are a creative logo designer for an AI/ML club called SCALE. 
         
@@ -71,9 +71,8 @@ class LogoGeneratorAgent:
         )
     
     def parse_logo_response(self, response: str, logo_id: int) -> LogoDesign:
-        """Parse the LLM response into a LogoDesign object"""
         try:
-            # Try to extract JSON from response
+            # try to extract JSON from response
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
@@ -90,11 +89,11 @@ class LogoGeneratorAgent:
         except Exception as e:
             print(f"    ⚠️ JSON parsing failed, using fallback: {e}")
         
-        # Fallback parsing - extract information from text
+        # falback parsing - extract information from text
         return self.create_fallback_logo(response, logo_id)
     
     def create_fallback_logo(self, response: str, logo_id: int) -> LogoDesign:
-        """Create a logo design from unstructured text response"""
+
         lines = response.split('\n')
         title = f"SCALE AI Logo {logo_id}"
         description = "AI-themed logo design for SCALE club"
@@ -102,7 +101,7 @@ class LogoGeneratorAgent:
         color_scheme = "Blue gradient with white accents"
         symbolism = "Represents artificial intelligence, learning, and community"
         
-        # Try to extract information from the response
+
         for line in lines:
             line = line.strip()
             if "title:" in line.lower() or "name:" in line.lower():
@@ -124,7 +123,6 @@ class LogoGeneratorAgent:
         )
     
     def generate_logos(self, club_description: str, personal_vision: str, num_logos: int = 3) -> List[LogoDesign]:
-        """Generate multiple logo designs"""
         prompt_template = self.create_generation_prompt()
         logos = []
         
@@ -147,7 +145,7 @@ class LogoGeneratorAgent:
                 
             except Exception as e:
                 print(f"  ❌ Error generating logo {i+1}: {e}")
-                # Create a fallback logo with varying quality
+                # creating a fallback logo with varying quality
                 fallback_designs = [
                     {
                         "title": f"Neural Nexus {i+1}",
@@ -187,7 +185,6 @@ class LogoGeneratorAgent:
         return logos
 
 class LogoJudgeAgent:
-    """Agent responsible for evaluating and judging logos"""
     
     def __init__(self, model_name: str = "llama2"):
         self.llm = OllamaLLM(
@@ -197,7 +194,7 @@ class LogoJudgeAgent:
         )
     
     def create_evaluation_prompt(self) -> PromptTemplate:
-        """Create prompt template for logo evaluation - more critical and detailed"""
+
         template = """
         You are a CRITICAL logo evaluation expert for an AI/ML club called SCALE. 
         You must be STRICT and REALISTIC in your scoring. Most logos have significant flaws.
@@ -272,22 +269,19 @@ class LogoJudgeAgent:
     def parse_evaluation_response(self, response: str, logo_id: int) -> LogoEvaluation:
         """Parse the LLM response into a LogoEvaluation object with realistic scoring"""
         try:
-            # Try to extract JSON from response
+           
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
                 data = json.loads(json_str)
                 
-                # Extract scores and ensure they're realistic (apply some randomness to avoid uniformity)
                 clarity = max(1, min(10, int(data.get("clarity_score", random.randint(4, 7)))))
                 relevance = max(1, min(10, int(data.get("relevance_score", random.randint(4, 7)))))
                 creativity = max(1, min(10, int(data.get("creativity_score", random.randint(3, 6)))))
                 vision = max(1, min(10, int(data.get("vision_alignment_score", random.randint(4, 7)))))
                 simplicity = max(1, min(10, int(data.get("simplicity_score", random.randint(5, 8)))))
                 
-                # Apply realistic scoring adjustment (prevent consistently high scores)
                 if clarity + relevance + creativity + vision + simplicity > 38:
-                    # Randomly reduce 1-2 scores by 1-2 points to make it more realistic
                     scores = [clarity, relevance, creativity, vision, simplicity]
                     for _ in range(random.randint(1, 2)):
                         idx = random.randint(0, 4)
@@ -309,12 +303,9 @@ class LogoJudgeAgent:
         except Exception as e:
             print(f"    ⚠️ JSON parsing failed, using realistic fallback: {e}")
         
-        # Fallback evaluation with more realistic, varied scoring
         return self.create_realistic_fallback_evaluation(response, logo_id)
     
     def create_realistic_fallback_evaluation(self, response: str, logo_id: int) -> LogoEvaluation:
-        """Create a realistic fallback evaluation with varied scoring"""
-        # Generate realistic scores with some variation
         base_scores = [
             random.randint(4, 7),  # clarity
             random.randint(5, 7),  # relevance 
@@ -323,7 +314,6 @@ class LogoJudgeAgent:
             random.randint(5, 8),  # simplicity
         ]
         
-        # Add some specific evaluation logic based on logo_id to create variation
         if logo_id == 1:
             reasoning = "First logo shows standard AI themes but lacks distinctiveness. Clarity could be improved with better typography. Creativity is limited by common neural network imagery."
         elif logo_id == 2:
@@ -346,7 +336,6 @@ class LogoJudgeAgent:
         )
     
     def evaluate_logo(self, logo: LogoDesign, club_description: str, personal_vision: str) -> LogoEvaluation:
-        """Evaluate a single logo design"""
         prompt_template = self.create_evaluation_prompt()
         
         prompt = prompt_template.format(
@@ -366,11 +355,9 @@ class LogoJudgeAgent:
             
         except Exception as e:
             print(f"  ❌ Error evaluating logo {logo.id}: {e}")
-            # Fallback evaluation with realistic scoring
             return self.create_realistic_fallback_evaluation("", logo.id)
     
     def evaluate_all_logos(self, logos: List[LogoDesign], club_description: str, personal_vision: str) -> List[LogoEvaluation]:
-        """Evaluate all logo designs"""
         evaluations = []
         
         print(f"🏆 Evaluating {len(logos)} logo designs...")
@@ -384,31 +371,28 @@ class LogoJudgeAgent:
         return evaluations
 
 class LogoPipeline:
-    """Main pipeline orchestrating the logo generation and evaluation process"""
     
     def __init__(self, model_name: str = "llama2"):
         self.generator = LogoGeneratorAgent(model_name)
         self.judge = LogoJudgeAgent(model_name)
     
     def run_basic_pipeline(self, club_description: str, personal_vision: str, num_logos: int = 3) -> Dict[str, Any]:
-        """Run the basic logo generation and evaluation pipeline (no iterations)"""
         
         print("🚀 Starting Logo Generation and Evaluation Pipeline")
         print("=" * 60)
         
-        # Generate logos
         logos = self.generator.generate_logos(club_description, personal_vision, num_logos)
         
-        # Evaluate logos
+        # evaluate logos
         evaluations = self.judge.evaluate_all_logos(logos, club_description, personal_vision)
         
-        # Find best logo
+        # find best logo
         best_evaluation = max(evaluations, key=lambda x: x.total_score)
         best_logo = next(logo for logo in logos if logo.id == best_evaluation.logo_id)
         
         print(f"\n🏅 Evaluation completed!")
         
-        # Prepare final results
+        #final results
         final_results = {
             "winning_logo": best_logo,
             "winning_evaluation": best_evaluation,
@@ -430,7 +414,7 @@ class LogoPipeline:
         winning_eval = results["winning_evaluation"]
         all_evaluations = results["all_evaluations"]
         
-        # Show all logos and their scores first
+ 
         print(f"\n📊 ALL LOGO SCORES:")
         print("-" * 40)
         for i, (logo, eval_data) in enumerate(zip(results["all_logos"], all_evaluations), 1):
@@ -462,10 +446,7 @@ class LogoPipeline:
         
         print("\n" + "=" * 80)
 
-# Example usage and main execution
-def main():
-    """Main function to run the logo pipeline"""
-    
+def main():    
     # SCALE club description and personal vision
     club_description = """
     SCALE is an AI/ML club focused on fostering learning, innovation, and community building 
@@ -485,11 +466,11 @@ def main():
     join our journey in exploring the frontiers of artificial intelligence.
     """
     
-    # Initialize and run pipeline
+    # initialize and run pipeline
     print("Initializing Logo Pipeline...")
     pipeline = LogoPipeline(model_name="llama2")
     
-    # Run basic pipeline only (no iterations)
+
     print("\n🎯 Running Basic Pipeline...")
     results = pipeline.run_basic_pipeline(
         club_description=club_description,
