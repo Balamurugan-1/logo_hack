@@ -1,25 +1,26 @@
 import json
 import re
 import random
+import os
+from datetime import datetime
 from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 
 
 @dataclass
 class LogoDesign:
-   
     id: int
     title: str
     description: str
     design_elements: List[str]
     color_scheme: str
     symbolism: str
+    generation_prompt: str = "" 
 
 @dataclass
 class LogoEvaluation:
-
     logo_id: int
     clarity_score: int
     relevance_score: int
@@ -28,10 +29,9 @@ class LogoEvaluation:
     simplicity_score: int
     total_score: int
     reasoning: str
+    evaluation_prompt: str = ""  
 
 class LogoGeneratorAgent:
-
-    
     def __init__(self, model_name: str = "llama2"):
         self.llm = OllamaLLM(
             model=model_name,
@@ -70,9 +70,9 @@ class LogoGeneratorAgent:
             input_variables=["club_description", "personal_vision", "logo_number"]
         )
     
-    def parse_logo_response(self, response: str, logo_id: int) -> LogoDesign:
+    def parse_logo_response(self, response: str, logo_id: int, prompt_used: str) -> LogoDesign:
         try:
-            # try to extract JSON from response
+            #  to extract JSON from response
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
@@ -84,16 +84,16 @@ class LogoGeneratorAgent:
                     description=data.get("description", "Modern AI-themed logo design"),
                     design_elements=data.get("design_elements", ["AI elements", "Modern design"]),
                     color_scheme=data.get("color_scheme", "Blue and white"),
-                    symbolism=data.get("symbolism", "Represents learning and AI")
+                    symbolism=data.get("symbolism", "Represents learning and AI"),
+                    generation_prompt=prompt_used
                 )
         except Exception as e:
-            print(f"    ⚠️ JSON parsing failed, using fallback: {e}")
+            print(f"   JSON parsing failed, using fallback: {e}")
         
-        # falback parsing - extract information from text
-        return self.create_fallback_logo(response, logo_id)
+        # fallback parsing - extract information from text
+        return self.create_fallback_logo(response, logo_id, prompt_used)
     
-    def create_fallback_logo(self, response: str, logo_id: int) -> LogoDesign:
-
+    def create_fallback_logo(self, response: str, logo_id: int, prompt_used: str) -> LogoDesign:
         lines = response.split('\n')
         title = f"SCALE AI Logo {logo_id}"
         description = "AI-themed logo design for SCALE club"
@@ -101,7 +101,6 @@ class LogoGeneratorAgent:
         color_scheme = "Blue gradient with white accents"
         symbolism = "Represents artificial intelligence, learning, and community"
         
-
         for line in lines:
             line = line.strip()
             if "title:" in line.lower() or "name:" in line.lower():
@@ -119,14 +118,15 @@ class LogoGeneratorAgent:
             description=description,
             design_elements=design_elements,
             color_scheme=color_scheme,
-            symbolism=symbolism
+            symbolism=symbolism,
+            generation_prompt=prompt_used
         )
     
     def generate_logos(self, club_description: str, personal_vision: str, num_logos: int = 3) -> List[LogoDesign]:
         prompt_template = self.create_generation_prompt()
         logos = []
         
-        print(f"🎨 Generating {num_logos} logo designs...")
+        print(f" Generating {num_logos} logo designs...")
         
         for i in range(num_logos):
             print(f"  Generating logo {i+1}...")
@@ -139,12 +139,12 @@ class LogoGeneratorAgent:
             
             try:
                 response = self.llm.invoke(prompt)
-                logo = self.parse_logo_response(response, i + 1)
+                logo = self.parse_logo_response(response, i + 1, prompt)
                 logos.append(logo)
-                print(f"  ✅ Logo {i+1}: '{logo.title}' generated successfully")
+                print(f"   Logo {i+1}: '{logo.title}' generated successfully")
                 
             except Exception as e:
-                print(f"  ❌ Error generating logo {i+1}: {e}")
+                print(f"   Error generating logo {i+1}: {e}")
                 # creating a fallback logo with varying quality
                 fallback_designs = [
                     {
@@ -177,24 +177,23 @@ class LogoGeneratorAgent:
                     description=design["description"],
                     design_elements=design["elements"],
                     color_scheme=design["colors"],
-                    symbolism=design["symbolism"]
+                    symbolism=design["symbolism"],
+                    generation_prompt=prompt
                 )
                 logos.append(fallback_logo)
-                print(f"  ⚠️ Used fallback for logo {i+1}")
+                print(f"   Used fallback for logo {i+1}")
         
         return logos
 
 class LogoJudgeAgent:
-    
     def __init__(self, model_name: str = "llama2"):
         self.llm = OllamaLLM(
             model=model_name,
-            temperature=0.1,  # Much lower temperature for consistent, critical evaluation
+            temperature=0.1,  # lower temperature for consistent evaluation , but can be changed
             num_predict=400
         )
     
     def create_evaluation_prompt(self) -> PromptTemplate:
-
         template = """
         You are a CRITICAL logo evaluation expert for an AI/ML club called SCALE. 
         You must be STRICT and REALISTIC in your scoring. Most logos have significant flaws.
@@ -266,10 +265,9 @@ class LogoJudgeAgent:
             ]
         )
     
-    def parse_evaluation_response(self, response: str, logo_id: int) -> LogoEvaluation:
+    def parse_evaluation_response(self, response: str, logo_id: int, prompt_used: str) -> LogoEvaluation:
         """Parse the LLM response into a LogoEvaluation object with realistic scoring"""
         try:
-           
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
@@ -298,14 +296,15 @@ class LogoJudgeAgent:
                     vision_alignment_score=vision,
                     simplicity_score=simplicity,
                     total_score=total,
-                    reasoning=data.get("reasoning", "Analysis based on professional design standards")
+                    reasoning=data.get("reasoning", "Analysis based on professional design standards"),
+                    evaluation_prompt=prompt_used
                 )
         except Exception as e:
-            print(f"    ⚠️ JSON parsing failed, using realistic fallback: {e}")
+            print(f"   JSON parsing failed, using realistic fallback: {e}")
         
-        return self.create_realistic_fallback_evaluation(response, logo_id)
+        return self.create_realistic_fallback_evaluation(response, logo_id, prompt_used)
     
-    def create_realistic_fallback_evaluation(self, response: str, logo_id: int) -> LogoEvaluation:
+    def create_realistic_fallback_evaluation(self, response: str, logo_id: int, prompt_used: str) -> LogoEvaluation:
         base_scores = [
             random.randint(4, 7),  # clarity
             random.randint(5, 7),  # relevance 
@@ -332,7 +331,8 @@ class LogoJudgeAgent:
             vision_alignment_score=base_scores[3],
             simplicity_score=base_scores[4],
             total_score=sum(base_scores),
-            reasoning=reasoning
+            reasoning=reasoning,
+            evaluation_prompt=prompt_used
         )
     
     def evaluate_logo(self, logo: LogoDesign, club_description: str, personal_vision: str) -> LogoEvaluation:
@@ -350,62 +350,136 @@ class LogoJudgeAgent:
         
         try:
             response = self.llm.invoke(prompt)
-            evaluation = self.parse_evaluation_response(response, logo.id)
+            evaluation = self.parse_evaluation_response(response, logo.id, prompt)
             return evaluation
             
         except Exception as e:
-            print(f"  ❌ Error evaluating logo {logo.id}: {e}")
-            return self.create_realistic_fallback_evaluation("", logo.id)
+            print(f"  Error evaluating logo {logo.id}: {e}")
+            return self.create_realistic_fallback_evaluation("", logo.id, prompt)
     
     def evaluate_all_logos(self, logos: List[LogoDesign], club_description: str, personal_vision: str) -> List[LogoEvaluation]:
         evaluations = []
         
-        print(f"🏆 Evaluating {len(logos)} logo designs...")
+        print(f" Evaluating {len(logos)} logo designs...")
         
         for logo in logos:
             print(f"  Evaluating '{logo.title}'...")
             evaluation = self.evaluate_logo(logo, club_description, personal_vision)
             evaluations.append(evaluation)
-            print(f"  ✅ Total Score: {evaluation.total_score}/50")
+            print(f"   Total Score: {evaluation.total_score}/50")
         
         return evaluations
 
-class LogoPipeline:
+class LogoDataManager:
+    """Handles saving and loading logo data to/from JSON files"""
     
+    @staticmethod
+    def save_results_to_json(results: Dict[str, Any], filename: str = None) -> str:
+        """Save the pipeline results to a JSON file"""
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"logo_results_{timestamp}.json"
+        
+        # json serialisation
+        json_data = {
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "total_logos_generated": len(results["all_logos"]),
+                "winning_logo_id": results["winning_logo"].id,
+                "winning_score": results["final_score"]
+            },
+            "logos": [],
+            "evaluations": []
+        }
+        
+        # logo data
+        for logo in results["all_logos"]:
+            logo_dict = asdict(logo)
+            json_data["logos"].append(logo_dict)
+        
+      
+        for evaluation in results["all_evaluations"]:
+            eval_dict = asdict(evaluation)
+            json_data["evaluations"].append(eval_dict)
+        
+
+        json_data["winning_logo"] = asdict(results["winning_logo"])
+        json_data["winning_evaluation"] = asdict(results["winning_evaluation"])
+        
+
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False)
+            
+            print(f"Results saved to: {filename}")
+            return filename
+            
+        except Exception as e:
+            print(f" Error saving to JSON: {e}")
+            return None
+    
+    @staticmethod
+    def load_results_from_json(filename: str) -> Dict[str, Any]:
+        """Load pipeline results from a JSON file"""
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            print(f" Results loaded from: {filename}")
+            return data
+            
+        except Exception as e:
+            print(f" Error loading from JSON: {e}")
+            return None
+    
+    @staticmethod
+    def list_saved_results() -> List[str]:
+        files = []
+        for file in os.listdir('.'):
+            if file.startswith('logo_results_') and file.endswith('.json'):
+                files.append(file)
+        return sorted(files)
+
+class LogoPipeline:
     def __init__(self, model_name: str = "llama2"):
         self.generator = LogoGeneratorAgent(model_name)
         self.judge = LogoJudgeAgent(model_name)
+        self.data_manager = LogoDataManager()
     
-    def run_basic_pipeline(self, club_description: str, personal_vision: str, num_logos: int = 3) -> Dict[str, Any]:
-        
-        print("🚀 Starting Logo Generation and Evaluation Pipeline")
+    def run_basic_pipeline(self, club_description: str, personal_vision: str, num_logos: int = 3, save_to_json: bool = True) -> Dict[str, Any]:
+        print("Starting Logo Generation and Evaluation Pipeline")
         print("=" * 60)
         
+        # logos generate
         logos = self.generator.generate_logos(club_description, personal_vision, num_logos)
         
         # evaluate logos
         evaluations = self.judge.evaluate_all_logos(logos, club_description, personal_vision)
         
-        # find best logo
+        # best logo
         best_evaluation = max(evaluations, key=lambda x: x.total_score)
         best_logo = next(logo for logo in logos if logo.id == best_evaluation.logo_id)
         
-        print(f"\n🏅 Evaluation completed!")
+        print(f"\n Evaluation completed!")
         
-        #final results
         final_results = {
             "winning_logo": best_logo,
             "winning_evaluation": best_evaluation,
             "all_logos": logos,
             "all_evaluations": evaluations,
-            "final_score": best_evaluation.total_score
+            "final_score": best_evaluation.total_score,
+            "club_description": club_description,
+            "personal_vision": personal_vision
         }
+        
+        if save_to_json:
+            saved_file = self.data_manager.save_results_to_json(final_results)
+            final_results["saved_file"] = saved_file
         
         self.display_results(final_results)
         return final_results
     
     def display_results(self, results: Dict[str, Any]):
-        """Display the final results in a clean format"""
         print("\n" + "=" * 80)
         print("🏆 FINAL RESULTS")
         print("=" * 80)
@@ -414,40 +488,59 @@ class LogoPipeline:
         winning_eval = results["winning_evaluation"]
         all_evaluations = results["all_evaluations"]
         
- 
-        print(f"\n📊 ALL LOGO SCORES:")
+        print(f"\n ALL LOGO SCORES:")
         print("-" * 40)
         for i, (logo, eval_data) in enumerate(zip(results["all_logos"], all_evaluations), 1):
             print(f"{i}. '{logo.title}': {eval_data.total_score}/50")
             print(f"   Scores: C:{eval_data.clarity_score} R:{eval_data.relevance_score} Cr:{eval_data.creativity_score} V:{eval_data.vision_alignment_score} S:{eval_data.simplicity_score}")
         
-        print(f"\n🎨 WINNING LOGO: {winning_logo.title}")
-        print(f"📊 FINAL SCORE: {winning_eval.total_score}/50")
+        print(f"\n WINNING LOGO: {winning_logo.title}")
+        print(f" FINAL SCORE: {winning_eval.total_score}/50")
         
-        print(f"\n📝 LOGO DESCRIPTION:")
+        print(f"\n LOGO DESCRIPTION:")
         print(f"   {winning_logo.description}")
         
-        print(f"\n🎯 DESIGN ELEMENTS:")
+        print(f"\n DESIGN ELEMENTS:")
         for element in winning_logo.design_elements:
             print(f"   • {element}")
         
-        print(f"\n🎨 COLOR SCHEME: {winning_logo.color_scheme}")
-        print(f"🔮 SYMBOLISM: {winning_logo.symbolism}")
+        print(f"\n COLOR SCHEME: {winning_logo.color_scheme}")
+        print(f" SYMBOLISM: {winning_logo.symbolism}")
         
-        print(f"\n📊 DETAILED SCORES:")
+        print(f"\n DETAILED SCORES:")
         print(f"   • Clarity: {winning_eval.clarity_score}/10")
         print(f"   • Relevance: {winning_eval.relevance_score}/10")
         print(f"   • Creativity: {winning_eval.creativity_score}/10")
         print(f"   • Vision Alignment: {winning_eval.vision_alignment_score}/10")
         print(f"   • Simplicity: {winning_eval.simplicity_score}/10")
         
-        print(f"\n💭 JUDGE'S REASONING:")
+        print(f"\n JUDGE'S REASONING:")
         print(f"   {winning_eval.reasoning}")
         
+        if "saved_file" in results and results["saved_file"]:
+            print(f"\n DATA SAVED TO: {results['saved_file']}")
+        
         print("\n" + "=" * 80)
+    
+    def load_and_display_previous_results(self, filename: str):
+        """Load and display results from a previous run"""
+        data = self.data_manager.load_results_from_json(filename)
+        if data:
+            print(f"\n PREVIOUS RESULTS FROM: {filename}")
+            print(f" Generated on: {data['metadata']['timestamp']}")
+            print(f" Winner: {data['winning_logo']['title']}")
+            print(f" Score: {data['metadata']['winning_score']}/50")
+            
+            print(f"\n GENERATION PROMPTS AND SCORES:")
+            print("=" * 50)
+            for i, (logo, evaluation) in enumerate(zip(data['logos'], data['evaluations'])):
+                print(f"\n LOGO {i+1}: {logo['title']}")
+                print(f" Score: {evaluation['total_score']}/50")
+                print(f" Generation Prompt: {logo['generation_prompt'][:100]}...")
+                print(f" Evaluation Prompt: {evaluation['evaluation_prompt'][:100]}...")
+                print(f" Reasoning: {evaluation['reasoning']}")
 
 def main():    
-    # SCALE club description and personal vision
     club_description = """
     SCALE is an AI/ML club focused on fostering learning, innovation, and community building 
     in the field of artificial intelligence and machine learning. The club aims to provide 
@@ -466,16 +559,34 @@ def main():
     join our journey in exploring the frontiers of artificial intelligence.
     """
     
-    # initialize and run pipeline
     print("Initializing Logo Pipeline...")
     pipeline = LogoPipeline(model_name="llama2")
     
-
-    print("\n🎯 Running Basic Pipeline...")
+    previous_files = LogoDataManager.list_saved_results()
+    if previous_files:
+        print(f"\n Found {len(previous_files)} previous result files:")
+        for i, file in enumerate(previous_files, 1):
+            print(f"  {i}. {file}")
+        
+        choice = input("\nWould you like to view a previous result? (y/n): ").lower().strip()
+        if choice == 'y':
+            try:
+                file_num = int(input(f"Enter file number (1-{len(previous_files)}): "))
+                if 1 <= file_num <= len(previous_files):
+                    pipeline.load_and_display_previous_results(previous_files[file_num - 1])
+                    
+                    continue_choice = input("\nContinue with new generation? (y/n): ").lower().strip()
+                    if continue_choice != 'y':
+                        return
+            except (ValueError, IndexError):
+                print("Invalid selection, continuing with new generation...")
+    
+    print("\n Running Basic Pipeline...")
     results = pipeline.run_basic_pipeline(
         club_description=club_description,
         personal_vision=personal_vision,
-        num_logos=3
+        num_logos=3,
+        save_to_json=True
     )
     
     return results
